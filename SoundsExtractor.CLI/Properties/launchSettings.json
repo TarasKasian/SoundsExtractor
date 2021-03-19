@@ -2,7 +2,7 @@
   "profiles": {
     "SoundsExtractor.CLI": {
       "commandName": "Project",
-      "commandLineArgs": "D:\\tmp\\SoundsExtractor\\cats.jpg D:\\tmp\\SoundsExtractor\\Output\\cats.wav"
+      "commandLineArgs": "D:\\ITProjects\\SoundsExtractor\\Example\\starryNight.jpg D:\\ITProjects\\SoundsExtractor\\Example\\starryNight.wav"
     }
   }
 }

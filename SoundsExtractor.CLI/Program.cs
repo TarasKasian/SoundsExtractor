@@ -12,31 +12,40 @@ namespace SoundsExtractor.CLI
 {
     class Program
     {
-        // Need to generate values:
-        // Frequency (brightness)
-        // SampleLength
-        // sampleLengthSequenceCount - mb read several of it from picture parts 
-
         private const int SampleRate = 44100;
+
         private const double SampleLength = 0.2;
 
-        private string _lowQualityImagePath = string.Empty;
+        private const int ResizedImageSideLength = 100;
+
+        private const string JpgExtension = ".jpg";
+
+        private const string WawExtension = ".wav";
 
         static void Main(string[] args)
         {
-            if (args.Length < 2 || args.Any(a => string.IsNullOrWhiteSpace(a)))
-                throw new ArgumentException();
+            if (!AreArgumentsValid(args))
+                return;
 
-            var inputFilePath = File.Exists(args[0]) ? args[0] : throw new ArgumentException();
+            var inputFilePath = args[0];
             var outputFilePath = args[1];
 
-            var resizedBitmap = Resize(GetBitmap(inputFilePath), 100, 100);
-            var compressedImagePath = CompressBitmap(resizedBitmap, inputFilePath); //CompressBitmap(inputFilePath);
+            Console.WriteLine("Compressing image file...");
+            var resizedBitmap = Resize(GetBitmap(inputFilePath), ResizedImageSideLength, ResizedImageSideLength);
+            var compressedImagePath = CompressBitmap(resizedBitmap, inputFilePath);
 
+            Console.WriteLine("Extracting sounds...");
             var brightnessSequence = GetBrightnessSequence(GetBitmap(compressedImagePath));
             var sampleChunks = GetSampleFrequencyChunks(brightnessSequence);
 
+            Console.WriteLine($"Saving result to \"{outputFilePath}\" file");
             WriteToWav(sampleChunks, outputFilePath);
+            File.Delete(compressedImagePath);
+
+            var defaultColor = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("Extraction completed.");
+            Console.ForegroundColor = defaultColor;
         }
 
         private static void WriteToWav(List<(int Frequency, double Length)> sampleChunks, string filePath) 
@@ -61,6 +70,42 @@ namespace SoundsExtractor.CLI
                     wfw.Write(bytes.ToArray(), 0, bytes.Count);
                 }
             }
+        }
+
+        private static bool AreArgumentsValid(string[] args) 
+        {
+            bool result = true;
+            string resultMessage = "Arguments are valid.";
+
+            if (args.Length < 2 || args.Any(a => string.IsNullOrWhiteSpace(a)))
+            {
+                result = false;
+                resultMessage = "Please, provide not empty 2 arguments.";
+            } 
+            else if (!File.Exists(args[0]))
+            {
+                result = false;
+                resultMessage = $"{args[0]} file is not exists.";
+            } 
+            else if (!string.Equals(Path.GetExtension(args[0]), JpgExtension, StringComparison.OrdinalIgnoreCase) ||
+                       !string.Equals(Path.GetExtension(args[1]), WawExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                result = false;
+                resultMessage = $"Unsupported file extension: must be \"{JpgExtension}\" for image file and \"{WawExtension}\" for sound file." +
+                    "\nImage file name must be the first argument and sound file name - the second.";
+            } 
+            else if (!Path.IsPathRooted(args[0]) || !Path.IsPathRooted(args[1])) 
+            {
+                result = false;
+                resultMessage = "Relative paths are not supported.";
+            }
+
+            var defaultColor = Console.ForegroundColor;
+            Console.ForegroundColor = result ? ConsoleColor.Green : ConsoleColor.Red;
+            Console.WriteLine(resultMessage);
+            Console.ForegroundColor = defaultColor;
+
+            return result;
         }
 
         private static SignalGenerator GetGenerator(double frequency)
@@ -150,26 +195,6 @@ namespace SoundsExtractor.CLI
             bitmap.Save(compressedImagePath, jpgEncoder, myEncoderParameters);
 
             return compressedImagePath;
-        }
-
-        private static string CompressBitmap(string imagePath)
-        {
-            var compressedImagePath = Path.Combine(Path.GetDirectoryName(imagePath), $"{Path.GetFileName(imagePath)}_compressed.jpg");
-
-            using (Bitmap bmp = new Bitmap(imagePath))
-            {
-                ImageCodecInfo jpgEncoder = GetEncoder(ImageFormat.Jpeg);
-
-                var myEncoder = Encoder.Quality;
-
-                var myEncoderParameters = new EncoderParameters(1);
-
-                var myEncoderParameter = new EncoderParameter(myEncoder, 0L);
-                myEncoderParameters.Param[0] = myEncoderParameter;
-                bmp.Save(compressedImagePath, jpgEncoder, myEncoderParameters);
-
-                return compressedImagePath;
-            }
         }
 
         private static ImageCodecInfo GetEncoder(ImageFormat format)
